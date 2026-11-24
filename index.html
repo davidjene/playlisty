@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#7a2e3a">
+<title>Playlisty pro scholu</title>
+<style>
+  :root{
+    --bg:#f6f1e9; --card:#fffdf9; --ink:#2b2423; --muted:#766b66; --line:#e6dccd;
+    --accent:#7a2e3a; --accent-ink:#ffffff; --accent-soft:#f3e3e5; --err:#a3262f;
+    --radius:14px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1b1717; --card:#252020; --ink:#f0e8e2; --muted:#a39892; --line:#3a3130;
+      --accent:#d48a97; --accent-ink:#2a1216; --accent-soft:#3a2428; --err:#f08a90;
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  .wrap{max-width:680px; margin:0 auto; padding:28px 16px 56px}
+
+  header{display:flex; gap:14px; align-items:center; margin-bottom:22px}
+  .logo{
+    flex:none; width:50px; height:50px; border-radius:14px;
+    background:var(--accent); color:var(--accent-ink);
+    display:grid; place-items:center;
+  }
+  h1{
+    font:600 1.6rem/1.2 Georgia,"Iowan Old Style","Palatino Linotype",serif;
+    margin:0; letter-spacing:.01em;
+  }
+  .sub{margin:4px 0 0; color:var(--muted)}
+
+  .card{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius); padding:16px; margin-bottom:16px;
+  }
+  .card-head{display:flex; align-items:center; justify-content:space-between; gap:12px}
+  h2{
+    font:600 1.15rem/1.3 Georgia,"Iowan Old Style","Palatino Linotype",serif;
+    margin:0;
+  }
+
+  .btn{
+    appearance:none; border:1px solid transparent; cursor:pointer;
+    background:var(--accent); color:var(--accent-ink);
+    font:inherit; font-weight:600; line-height:1.2;
+    min-height:44px; padding:10px 16px; border-radius:10px;
+    transition:filter .15s, background .15s;
+  }
+  .btn:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.6; cursor:default; filter:none}
+  .btn.ghost{background:transparent; color:var(--ink); border-color:var(--line); font-weight:500}
+  .btn.ghost:hover{background:var(--accent-soft); filter:none}
+  .btn.danger{color:var(--err)}
+  .btn.small{min-height:36px; padding:6px 12px; font-size:.9rem}
+  .linkbtn{
+    appearance:none; background:none; border:0; padding:4px; cursor:pointer;
+    color:var(--muted); font:inherit; font-size:.875rem; text-decoration:underline;
+  }
+  :focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+  #status{color:var(--muted); padding:18px 0 4px}
+  #status.err{color:var(--err)}
+  ul#list{list-style:none; margin:8px 0 0; padding:0}
+  #list li{
+    display:flex; align-items:center; gap:12px;
+    padding:14px 0; border-top:1px solid var(--line);
+  }
+  #list li:first-child{border-top:0}
+  .info{flex:1; min-width:0}
+  .date{font-size:.8rem; color:var(--muted); display:block}
+  .date::first-letter{text-transform:uppercase}
+  .name{font-weight:600; overflow-wrap:anywhere}
+  .actions{display:flex; gap:8px; flex:none; align-items:center}
+
+  .hint{
+    margin:14px 0 0; padding:12px 14px; border-radius:10px;
+    background:var(--accent-soft); font-size:.9rem;
+  }
+  .hint code{background:var(--card)}
+  @media (max-width:480px){
+    /* správce má dvě tlačítka – název dostane celý řádek */
+    body.admin #list li{flex-wrap:wrap}
+    body.admin #list .info{flex-basis:100%}
+    body.admin #list .actions{margin-left:auto}
+  }
+
+  .drop{
+    display:block; text-align:center; cursor:pointer;
+    border:2px dashed var(--line); border-radius:var(--radius);
+    padding:28px 16px; margin-top:12px; color:var(--muted);
+    transition:border-color .15s, background .15s;
+  }
+  .drop:hover,.drop.over,.drop:focus-within{border-color:var(--accent); background:var(--accent-soft)}
+  .drop b{color:var(--ink)}
+  .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+
+  form .row{display:grid; gap:12px; margin-top:14px}
+  @media (min-width:520px){ form .row.two{grid-template-columns:1fr 190px} }
+  label.f{display:grid; gap:4px; font-size:.875rem; color:var(--muted)}
+  input[type=text],input[type=password],input[type=date]{
+    font:inherit; color:var(--ink); background:var(--bg);
+    border:1px solid var(--line); border-radius:10px;
+    min-height:44px; padding:8px 12px; width:100%;
+  }
+  .btns{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap}
+  .fname{font-size:.85rem; color:var(--muted); margin:10px 0 0; overflow-wrap:anywhere}
+  .formerr{color:var(--err); font-size:.9rem; margin:10px 0 0}
+
+  details{margin-top:12px; font-size:.9rem; color:var(--muted)}
+  summary{cursor:pointer}
+  details ol{margin:8px 0 0; padding-left:20px}
+  details li{margin:4px 0}
+  code{
+    background:var(--accent-soft); padding:1px 5px; border-radius:5px;
+    font-size:.88em; overflow-wrap:anywhere;
+  }
+
+  footer{text-align:center; margin-top:28px}
+  #toast{
+    position:fixed; left:50%; bottom:22px; transform:translate(-50%,20px);
+    background:var(--ink); color:var(--bg); padding:11px 18px; border-radius:12px;
+    max-width:calc(100% - 32px); opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s; font-size:.95rem; text-align:center;
+  }
+  #toast.show{opacity:1; transform:translate(-50%,0)}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>
+    </div>
+    <div>
+      <h1 id="pageTitle">Playlisty pro scholu</h1>
+      <p class="sub">Stáhni si playlist a otevři ho v aplikaci Zpěvník pro scholy.</p>
+    </div>
+  </header>
+
+  <section class="card" aria-labelledby="listHead">
+    <div class="card-head">
+      <h2 id="listHead">Ke stažení</h2>
+      <button class="btn ghost small" id="refresh" type="button">Obnovit</button>
+    </div>
+    <div id="status" role="status">Načítám…</div>
+    <ul id="list"></ul>
+    <p class="hint">Přišel ti playlist přes Messenger nebo WhatsApp s příponou <code>.json</code>? Stáhni si ho raději odsud – soubor tu má vždy správnou příponu <code>.proscholy</code>.</p>
+  </section>
+
+  <section class="card" id="adminCard" hidden aria-labelledby="adminHead">
+    <h2 id="adminHead">Nahrát nový playlist</h2>
+    <label class="drop" id="drop">
+      <input class="sr" type="file" id="file">
+      <span>Přetáhni sem soubor <b>.proscholy</b><br>nebo klepni a vyber ho</span>
+    </label>
+    <form id="form" hidden>
+      <p class="fname" id="fname"></p>
+      <div class="row two">
+        <label class="f">Název
+          <input type="text" id="title" maxlength="80" required placeholder="např. Neděle – mše v 10:30">
+        </label>
+        <label class="f">Datum mše / akce
+          <input type="date" id="date" required>
+        </label>
+      </div>
+      <p class="formerr" id="formerr" hidden></p>
+      <div class="btns">
+        <button class="btn" id="send" type="submit">Nahrát</button>
+        <button class="btn ghost" id="cancel" type="button">Zrušit</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card" id="loginCard" hidden aria-labelledby="loginHead">
+    <h2 id="loginHead">Přihlášení správce</h2>
+    <p style="margin:6px 0 0;color:var(--muted);font-size:.95rem">Stahovat může každý bez přihlášení. Token potřebuješ jen ty, kdo playlisty nahrává.</p>
+    <form id="loginForm">
+      <div class="row">
+        <label class="f">Přístupový token z GitHubu
+          <input type="password" id="token" autocomplete="off" required placeholder="github_pat_…">
+        </label>
+      </div>
+      <p class="formerr" id="loginerr" hidden></p>
+      <div class="btns"><button class="btn" id="loginBtn" type="submit">Přihlásit</button></div>
+    </form>
+    <details>
+      <summary>Jak token získat</summary>
+      <ol>
+        <li>Na GitHubu otevři <b>Settings → Developer settings → Personal access tokens → Fine-grained tokens</b> a klepni na <b>Generate new token</b>.</li>
+        <li>U <b>Repository access</b> zvol <b>Only select repositories</b> a vyber repozitář s touto stránkou.</li>
+        <li>V <b>Permissions → Repository permissions</b> nastav <b>Contents: Read and write</b>.</li>
+        <li>Token vygeneruj, zkopíruj (začíná <code>github_pat_</code>) a vlož sem. Zůstane uložený jen v tomto prohlížeči.</li>
+      </ol>
+    </details>
+  </section>
+
+  <footer>
+    <button class="linkbtn" id="adminToggle" type="button">Správce</button>
+  </footer>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<noscript><p style="text-align:center">Pro zobrazení playlistů je potřeba zapnout JavaScript.</p></noscript>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- Nastavení ---------- */
+  const CONFIG = {
+    title:  'Playlisty pro scholu', // nadpis stránky
+    owner:  '',                     // GitHub uživatel – nech prázdné, zjistí se z adresy stránky
+    repo:   '',                     // název repozitáře – nech prázdné, zjistí se z adresy stránky
+    folder: 'playlisty'             // složka v repozitáři, kam se playlisty ukládají
+  };
+
+  const KEY = 'schola-playlisty-token';
+  const API = 'https://api.github.com';
+  const $ = id => document.getElementById(id);
+
+  /* ---------- Zjištění repozitáře ---------- */
+  function detectRepo() {
+    let { owner, repo } = CONFIG;
+    const host = location.hostname;
+    if ((!owner || !repo) && host.endsWith('.github.io')) {
+      owner = owner || host.split('.')[0];
+      const first = location.pathname.split('/').filter(Boolean)[0];
+      repo = repo || (first && !/\.html?$/i.test(first) ? first : owner + '.github.io');
+    }
+    return { owner, repo };
+  }
+  const { owner, repo } = detectRepo();
+
+  const folderPath = CONFIG.folder.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+  const listPath = () => `/repos/${owner}/${repo}/contents/${folderPath}`;
+  const filePath = name => `${listPath()}/${encodeURIComponent(name)}`;
+
+  /* ---------- Stav ---------- */
+  let token = null;
+  try { token = localStorage.getItem(KEY) || null; } catch (e) {}
+  let isAdmin = false;
+  let items = [];
+  let pendingFile = null;
+
+  document.title = CONFIG.title;
+  $('pageTitle').textContent = CONFIG.title;
+
+  /* ---------- Pomocné funkce ---------- */
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 4500);
+  }
+
+  function setStatus(msg, isErr) {
+    const s = $('status');
+    s.textContent = msg || '';
+    s.hidden = !msg;
+    s.classList.toggle('err', !!isErr);
+  }
+
+  function showErr(el, msg) {
+    el.textContent = msg || '';
+    el.hidden = !msg;
+  }
+
+  function gh(path, opts = {}) {
+    const headers = { Accept: 'application/vnd.github+json' };
+    if (token) headers.Authorization = 'Bearer ' + token;
+    if (opts.body) headers['Content-Type'] = 'application/json';
+    return fetch(API + path, Object.assign({ cache: 'no-store' }, opts, { headers }));
+  }
+
+  async function apiMessage(res) {
+    try { const j = await res.json(); return j && j.message ? j.message : ''; } catch (e) { return ''; }
+  }
+
+  function parseName(file) {
+    let base = file.name.replace(/\.(proscholy|json)$/i, '');
+    let date = null;
+    const m = base.match(/^(\d{4}-\d{2}-\d{2})[_\s-]*(.*)$/);
+    if (m) { date = m[1]; base = m[2]; }
+    const title = base.replace(/_/g, ' ').trim() || 'Playlist';
+    return Object.assign({}, file, { title, date });
+  }
+
+  function fmtDate(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('cs-CZ', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+  }
+
+  function todayISO() {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  }
+
+  function downloadName(name) {
+    return name.replace(/\.json$/i, '') .replace(/(\.proscholy)?$/i, '.proscholy');
+  }
+
+  function buildName(title, date) {
+    const clean = title.replace(/[\\\/:*?"<>|#%]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) || 'playlist';
+    return `${date}_${clean.replace(/ /g, '_')}.proscholy`;
+  }
+
+  function toBase64(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(',')[1] || '');
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(file);
+    });
+  }
+
+  /* ---------- Načtení seznamu ---------- */
+  async function loadList() {
+    if (!owner || !repo) {
+      setStatus('Stránka zatím neví, ke kterému repozitáři patří. Otevři soubor index.html a na začátku skriptu vyplň „owner“ a „repo“.', true);
+      return;
+    }
+    setStatus('Načítám…');
+    try {
+      let res = await gh(listPath());
+      if (res.status === 401 && token) {          // vypršelý token nesmí rozbít veřejný výpis
+        logout(true);
+        res = await gh(listPath());
+      }
+      if (res.status === 404) { items = []; render(); return; }
+      if (res.status === 403 || res.status === 429) {
+        setStatus('GitHub dočasně omezil počet dotazů. Zkus to prosím za pár minut.', true);
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      items = (Array.isArray(data) ? data : [])
+        .filter(f => f.type === 'file' && !f.name.startsWith('.') && !/^readme/i.test(f.name))
+        .map(parseName);
+      render();
+    } catch (e) {
+      setStatus('Seznam se nepodařilo načíst. Zkontroluj připojení a zkus „Obnovit“.', true);
+    }
+  }
+
+  /* ---------- Vykreslení ---------- */
+  function render() {
+    items.sort((a, b) => (b.date || '').localeCompare(a.date || '') || a.name.localeCompare(b.name, 'cs'));
+    const ul = $('list');
+    ul.textContent = '';
+    setStatus(items.length ? '' : 'Zatím tu není žádný playlist.');
+
+    for (const f of items) {
+      const li = document.createElement('li');
+
+      const info = document.createElement('div');
+      info.className = 'info';
+      if (f.date) {
+        const d = document.createElement('span');
+        d.className = 'date';
+        d.textContent = fmtDate(f.date);
+        info.append(d);
+      }
+      const n = document.createElement('div');
+      n.className = 'name';
+      n.textContent = f.title;
+      info.append(n);
+
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      if (isAdmin) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'btn ghost danger small';
+        del.textContent = 'Smazat';
+        del.setAttribute('aria-label', 'Smazat playlist ' + f.title);
+        del.addEventListener('click', () => removeFile(f, del));
+        actions.append(del);
+      }
+
+      const dl = document.createElement('button');
+      dl.type = 'button';
+      dl.className = 'btn';
+      dl.textContent = 'Stáhnout';
+      dl.setAttribute('aria-label', 'Stáhnout playlist ' + f.title);
+      dl.addEventListener('click', () => download(f, dl));
+      actions.append(dl);
+
+      li.append(info, actions);
+      ul.append(li);
+    }
+  }
+
+  /* ---------- Stažení ---------- */
+  async function download(f, btn) {
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Stahuji…';
+    const sameOrigin = `${CONFIG.folder.replace(/^\/+|\/+$/g, '')}/${encodeURIComponent(f.name)}`;
+    const urls = [f.download_url, sameOrigin].filter(Boolean);
+    try {
+      let blob = null;
+      for (const u of urls) {
+        try {
+          const res = await fetch(u, { cache: 'no-store' });
+          if (res.ok) { blob = await res.blob(); break; }
+        } catch (e) { /* zkusíme další adresu */ }
+      }
+      if (!blob) throw new Error('download');
+      // octet-stream: prohlížeč nesmí příponu „vylepšit“ podle obsahu
+      const file = new Blob([blob], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file);
+      a.download = downloadName(f.name);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+    } catch (e) {
+      toast('Stažení se nepovedlo. Zkus to prosím znovu.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  }
+
+  /* ---------- Režim správce ---------- */
+  function applyAdminUI() {
+    $('adminCard').hidden = !isAdmin;
+    $('loginCard').hidden = true;
+    $('adminToggle').textContent = isAdmin ? 'Odhlásit správce' : 'Správce';
+    document.body.classList.toggle('admin', isAdmin);
+    render();
+  }
+
+  function logout(silent) {
+    token = null;
+    isAdmin = false;
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    resetUpload();
+    applyAdminUI();
+    if (!silent) toast('Odhlášeno.');
+  }
+
+  async function verifyToken() {
+    const res = await gh(`/repos/${owner}/${repo}`);
+    if (res.status === 401) return 'Token není platný nebo už vypršel.';
+    if (!res.ok) return 'Token nemá přístup k tomuto repozitáři.';
+    const data = await res.json();
+    if (data.permissions && data.permissions.push === false) {
+      return 'Token smí jen číst. Nastav mu oprávnění „Contents: Read and write“.';
+    }
+    return '';
+  }
+
+  $('adminToggle').addEventListener('click', () => {
+    if (isAdmin) { logout(); return; }
+    const c = $('loginCard');
+    c.hidden = !c.hidden;
+    if (!c.hidden) $('token').focus();
+  });
+
+  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!owner || !repo) { showErr($('loginerr'), 'Nejdřív musí být nastaven repozitář (viz výše).'); return; }
+    const btn = $('loginBtn');
+    btn.disabled = true;
+    showErr($('loginerr'), '');
+    token = $('token').value.trim();
+    try {
+      const problem = await verifyToken();
+      if (problem) { token = null; showErr($('loginerr'), problem); return; }
+      try { localStorage.setItem(KEY, token); } catch (err) {}
+      isAdmin = true;
+      $('token').value = '';
+      applyAdminUI();
+      toast('Jsi přihlášen jako správce.');
+    } catch (err) {
+      token = null;
+      showErr($('loginerr'), 'Nepodařilo se spojit s GitHubem. Zkontroluj připojení.');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  /* ---------- Nahrávání ---------- */
+  function resetUpload() {
+    pendingFile = null;
+    $('file').value = '';
+    $('form').hidden = true;
+    $('drop').hidden = false;
+    showErr($('formerr'), '');
+  }
+
+  function pickFile(file) {
+    if (!file) return;
+    if (file.size === 0) { toast('Soubor je prázdný.'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast('Soubor je na playlist nezvykle velký (nad 5 MB).'); return; }
+    pendingFile = file;
+    const base = file.name.replace(/\.(proscholy|json)$/i, '');
+    const m = base.match(/^(\d{4}-\d{2}-\d{2})[_\s-]*(.*)$/);
+    $('title').value = (m ? m[2] : base).replace(/_/g, ' ').trim();
+    $('date').value = m ? m[1] : todayISO();
+    $('fname').textContent = 'Vybraný soubor: ' + file.name;
+    showErr($('formerr'), '');
+    $('drop').hidden = true;
+    $('form').hidden = false;
+    $('title').focus();
+    $('title').select();
+  }
+
+  $('file').addEventListener('change', e => pickFile(e.target.files[0]));
+  $('cancel').addEventListener('click', resetUpload);
+
+  const drop = $('drop');
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => pickFile(e.dataTransfer.files[0]));
+  // aby soubor puštěný mimo okénko neotevřel prohlížeč
+  ['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => { if (e.target !== drop && !drop.contains(e.target)) e.preventDefault(); }));
+
+  $('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!pendingFile) return;
+    const name = buildName($('title').value, $('date').value);
+    const existing = items.find(i => i.name === name);
+    if (existing && !confirm('Playlist s tímto názvem a datem už existuje. Přepsat ho?')) return;
+
+    const btn = $('send');
+    btn.disabled = true;
+    btn.textContent = 'Nahrávám…';
+    showErr($('formerr'), '');
+    try {
+      const body = { message: 'Přidán playlist: ' + name, content: await toBase64(pendingFile) };
+      if (existing) body.sha = existing.sha;
+      const res = await gh(filePath(name), { method: 'PUT', body: JSON.stringify(body) });
+      if (!res.ok) {
+        const msg = await apiMessage(res);
+        if (res.status === 401) { logout(true); toast('Token už neplatí, přihlas se prosím znovu.'); return; }
+        if (res.status === 403 || res.status === 404) throw new Error('Token nemá právo zapisovat do repozitáře. Zkontroluj „Contents: Read and write“.');
+        if (res.status === 409 || res.status === 422) throw new Error('Soubor se mezitím změnil. Klepni na „Obnovit“ a zkus to znovu.');
+        throw new Error(msg || 'Nahrání se nepovedlo (HTTP ' + res.status + ').');
+      }
+      const data = await res.json();
+      const c = data.content;
+      items = items.filter(i => i.name !== c.name);
+      items.push(parseName({ name: c.name, sha: c.sha, type: 'file', download_url: c.download_url }));
+      render();
+      resetUpload();
+      toast('Hotovo, playlist je nahraný. Na stránce bude do minuty.');
+    } catch (err) {
+      showErr($('formerr'), err.message || 'Nahrání se nepovedlo.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Nahrát';
+    }
+  });
+
+  async function removeFile(f, btn) {
+    if (!confirm(`Opravdu smazat „${f.title}“?`)) return;
+    btn.disabled = true;
+    try {
+      const res = await gh(filePath(f.name), {
+        method: 'DELETE',
+        body: JSON.stringify({ message: 'Smazán playlist: ' + f.name, sha: f.sha })
+      });
+      if (res.status === 401) { logout(true); toast('Token už neplatí, přihlas se prosím znovu.'); return; }
+      if (!res.ok) throw new Error();
+      items = items.filter(i => i.name !== f.name);
+      render();
+      toast('Playlist smazán.');
+    } catch (e) {
+      btn.disabled = false;
+      toast('Smazání se nepovedlo.');
+    }
+  }
+
+  /* ---------- Start ---------- */
+  $('refresh').addEventListener('click', loadList);
+
+  (async function init() {
+    await loadList();
+    if (token && owner && repo) {
+      try {
+        const problem = await verifyToken();
+        if (problem) { logout(true); return; }
+        isAdmin = true;
+        applyAdminUI();
+      } catch (e) { /* offline – správcovské funkce se zapnou příště */ }
+    }
+  })();
+})();
+</script>
+</body>
+</html>
