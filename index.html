@@ -148,14 +148,7 @@
   }
   .item.mse .note .more{color:var(--t-mse)}
   .count{display:block; text-align:right; font-size:.78rem; color:var(--muted); min-height:1.2em}
-  .addnote{
-    appearance:none; cursor:pointer; margin-top:8px; padding:4px 12px;
-    background:none; color:var(--muted); font:inherit; font-size:.82rem;
-    border:1px dashed rgba(255,255,255,.28); border-radius:99px;
-  }
-  .addnote:hover{color:var(--ink); border-color:rgba(255,255,255,.55)}
   .arow{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
-  .arow .addnote{margin-top:0}
   .editbtn{
     appearance:none; cursor:pointer; padding:4px 12px;
     display:inline-flex; align-items:center; gap:6px;
@@ -277,7 +270,7 @@
 <header class="hero">
   <div class="hero-bg" aria-hidden="true"></div>
   <div class="hero-inner">
-    <p class="eyebrow">Zpěvník pro scholy plus</p>
+    <p class="eyebrow">Zpěvník pro scholy</p>
     <h1>Playlisty pro<br><span class="ga">chvály</span> a <span class="gb">mše</span></h1>
     <p class="sub">Stáhni si playlist a otevři ho v aplikaci Zpěvník pro scholy.</p>
   </div>
@@ -427,7 +420,6 @@
   let pendingFile = null;
   let notes = {};          // jméno souboru → poznámka
   let editingPath = null;  // který playlist se právě upravuje
-  let editFocus = 'title'; // které políčko v editoru dostane kurzor
   const openNotes = new Set();   // poznámky, které si čtenář rozbalil
   let animateNext = true;  // karty „naskočí“ jen při načtení seznamu, ne při každé úpravě
   let filter = { '#chvaly': 'chvaly', '#mse': 'mse' }[location.hash] || 'all';
@@ -858,7 +850,7 @@
     });
 
     f.append(row, fs, ln, err, btns);
-    setTimeout(() => (editFocus === 'note' ? ta : title).focus(), 0);
+    setTimeout(() => title.focus(), 0);
     return f;
   }
 
@@ -957,13 +949,8 @@
         edit.className = 'editbtn';
         edit.innerHTML = ICON.edit + '<span>Upravit</span>';
         edit.setAttribute('aria-label', 'Upravit playlist ' + it.title);
-        edit.addEventListener('click', () => { editingPath = it.path; editFocus = 'title'; render(); });
-        const nb = document.createElement('button');
-        nb.type = 'button';
-        nb.className = 'addnote';
-        nb.textContent = noteText ? 'Upravit poznámku' : '+ Přidat poznámku';
-        nb.addEventListener('click', () => { editingPath = it.path; editFocus = 'note'; render(); });
-        row.append(edit, nb);
+        edit.addEventListener('click', () => { editingPath = it.path; render(); });
+        row.append(edit);
         info.append(row);
       }
     }
