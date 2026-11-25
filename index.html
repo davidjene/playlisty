@@ -154,6 +154,16 @@
     border:1px dashed rgba(255,255,255,.28); border-radius:99px;
   }
   .addnote:hover{color:var(--ink); border-color:rgba(255,255,255,.55)}
+  .arow{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+  .arow .addnote{margin-top:0}
+  .editbtn{
+    appearance:none; cursor:pointer; padding:4px 12px;
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,.08); color:var(--ink); font:inherit; font-size:.82rem;
+    border:1px solid var(--line); border-radius:99px;
+  }
+  .editbtn:hover{background:rgba(255,255,255,.17)}
+  li.item.editing .date, li.item.editing .name{display:none}
   li.item.editing{flex-wrap:wrap}
   li.item.editing .info{flex-basis:100%}
   li.item.editing .actions{display:none}
@@ -382,6 +392,7 @@
     mse:    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 3v18M6.5 9h11"/></svg>',
     jine:   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
     note:   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+    edit:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     dl:     '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>'
   };
 
@@ -415,7 +426,8 @@
   let items = [];
   let pendingFile = null;
   let notes = {};          // jméno souboru → poznámka
-  let editingName = null;  // u kterého playlistu se právě píše poznámka
+  let editingPath = null;  // který playlist se právě upravuje
+  let editFocus = 'title'; // které políčko v editoru dostane kurzor
   const openNotes = new Set();   // poznámky, které si čtenář rozbalil
   let animateNext = true;  // karty „naskočí“ jen při načtení seznamu, ne při každé úpravě
   let filter = { '#chvaly': 'chvaly', '#mse': 'mse' }[location.hash] || 'all';
@@ -600,9 +612,8 @@
     } catch (err) { /* bez poznámek se seznam zobrazí taky */ }
   }
 
-  // Přečte aktuální poznamky.json, upraví jeden záznam a uloží. Když mezitím uložil někdo jiný, zkusí to znovu.
-  async function saveNote(name, text) {
-    text = text.trim().slice(0, NOTE_MAX);
+  // Upraví poznamky.json: fn dostane aktuální obsah a změní ho. Když mezitím uložil jiný správce, zkusí to znovu.
+  async function editNotes(fn, message) {
     for (let attempt = 0; attempt < 2; attempt++) {
       let sha = null, current = {};
       const got = await gh(contentsUrl(notesPath));
@@ -613,19 +624,36 @@
       } else if (got.status !== 404) {
         throw await apiError(got);
       }
-      if (text) current[name] = text; else delete current[name];
+      fn(current);
       if (!sha && !Object.keys(current).length) { notes = current; return; }
 
-      const body = {
-        message: (text ? 'Poznámka k playlistu: ' : 'Smazána poznámka: ') + name,
-        content: utf8ToB64(JSON.stringify(current, null, 2) + '\n')
-      };
+      const body = { message, content: utf8ToB64(JSON.stringify(current, null, 2) + '\n') };
       if (sha) body.sha = sha;
       const put = await gh(contentsUrl(notesPath), { method: 'PUT', body: JSON.stringify(body) });
       if (put.ok) { notes = current; return; }
       if ((put.status === 409 || put.status === 422) && attempt === 0) continue;
       throw await apiError(put);
     }
+  }
+
+  function saveNote(name, text) {
+    text = text.trim().slice(0, NOTE_MAX);
+    return editNotes(cur => { if (text) cur[name] = text; else delete cur[name]; },
+      (text ? 'Poznámka k playlistu: ' : 'Smazána poznámka: ') + name);
+  }
+
+  // obsah souboru v base64 (pro přesun pod nový název)
+  async function getFileBase64(it) {
+    const res = await gh(contentsUrl(it.path));
+    if (res.ok) {
+      const d = await res.json();
+      if (d.content) return d.content.replace(/\s/g, '');
+    } else if (res.status === 401) {
+      throw await apiError(res);
+    }
+    const raw = await fetch(it.url, { cache: 'no-store' });          // větší soubor: vezmeme surový obsah
+    if (!raw.ok) throw new Error('Soubor se nepodařilo přečíst z GitHubu.');
+    return toBase64(await raw.blob());
   }
 
   function noteEl(text, name) {
@@ -665,23 +693,131 @@
   let resizeTimer;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(measureNotes, 150); });
 
-  function noteForm(it, text) {
+  // GitHub neumí soubor přejmenovat: vytvoříme ho pod novým jménem a původní smažeme.
+  async function applyEdit(it, v) {
+    const oldNote = notes[it.name] || '';
+    const note = v.note.trim().slice(0, NOTE_MAX);
+    let target = it;
+    let warning = '';
+
+    if (v.metaChanged) {
+      const sameText = v.title === v.initial.title.trim() && v.date === v.initial.date;
+      const newName = sameText ? it.name : buildName(v.title, v.date);
+      const folder = v.cat ? `${dir}/${CATS[v.cat].dir}` : it.path.slice(0, it.path.lastIndexOf('/'));
+      const newPath = `${folder}/${newName}`;
+
+      if (newPath !== it.path) {
+        if (items.some(i => i.path === newPath)) {
+          throw new Error('Playlist s tímto názvem a datem už v téhle kategorii existuje. Změň název nebo datum.');
+        }
+        const content = await getFileBase64(it);
+        const put = await gh(contentsUrl(newPath), {
+          method: 'PUT',
+          body: JSON.stringify({ message: 'Přesunut playlist: ' + it.path + ' → ' + newPath, content })
+        });
+        if (!put.ok) throw await apiError(put);
+        const data = await put.json();
+        const created = parseItem(data.content.path, data.content.sha);
+        if (v.cat) created.cat = v.cat;
+        items.push(created);
+        target = created;
+
+        const del = await gh(contentsUrl(it.path), {
+          method: 'DELETE',
+          body: JSON.stringify({ message: 'Přesunut playlist (smazán původní soubor): ' + it.path, sha: it.sha })
+        });
+        if (del.ok) items = items.filter(i => i.path !== it.path);
+        else warning = 'Playlist je uložený pod novým názvem, ale původní soubor se nepodařilo smazat. Smaž ho ručně tlačítkem Smazat.';
+      }
+    }
+
+    // poznámka patří k názvu souboru, takže se při přejmenování přesune s ním
+    const nameChanged = target.name !== it.name;
+    if (nameChanged || note !== oldNote) {
+      const keepOld = items.some(i => i.name === it.name && i.path !== it.path && i.path !== target.path);
+      try {
+        await editNotes(cur => {
+          if (nameChanged && !keepOld) delete cur[it.name];
+          if (note) cur[target.name] = note; else delete cur[target.name];
+        }, 'Poznámka k playlistu: ' + target.name);
+      } catch (err) {
+        if (err.auth || !target || target === it) throw err;
+        warning = (warning ? warning + ' ' : '') + 'Poznámku se nepodařilo přesunout, uprav ji tlačítkem u playlistu.';
+      }
+    }
+    return { item: target, warning };
+  }
+
+  function editForm(it) {
+    const initial = {
+      title: it.title,
+      date: it.date || todayISO(),
+      cat: (it.cat === 'chvaly' || it.cat === 'mse') ? it.cat : null
+    };
+
     const f = document.createElement('form');
-    f.className = 'noteform';
+    f.className = 'noteform editform';
+
+    const row = document.createElement('div');
+    row.className = 'row two';
+    const lt = document.createElement('label');
+    lt.className = 'f';
+    lt.append('Název');
+    const title = document.createElement('input');
+    title.type = 'text';
+    title.maxLength = 80;
+    title.required = true;
+    title.value = initial.title;
+    lt.append(title);
+    const ld = document.createElement('label');
+    ld.className = 'f';
+    ld.append('Datum');
+    const date = document.createElement('input');
+    date.type = 'date';
+    date.required = true;
+    date.value = initial.date;
+    ld.append(date);
+    row.append(lt, ld);
+
+    const fs = document.createElement('fieldset');
+    fs.className = 'cats';
+    const lg = document.createElement('legend');
+    lg.textContent = 'Druh playlistu';
+    fs.append(lg);
+    for (const key of ['chvaly', 'mse']) {
+      const lab = document.createElement('label');
+      lab.className = 'pill ' + key;
+      const r = document.createElement('input');
+      r.type = 'radio';
+      r.name = 'ecat';
+      r.value = key;
+      r.checked = initial.cat === key;
+      const sp = document.createElement('span');
+      sp.textContent = CATS[key].label;
+      lab.append(r, sp);
+      fs.append(lab);
+    }
+
+    const ln = document.createElement('label');
+    ln.className = 'f';
+    ln.style.marginTop = '14px';
+    ln.append('Poznámka (nepovinné) – třeba tóniny písní');
     const ta = document.createElement('textarea');
     ta.rows = 6;
     ta.maxLength = NOTE_MAX;
-    ta.value = text;
+    ta.value = notes[it.name] || '';
     ta.placeholder = 'Např. po řádcích:\n1. Hosana – G\n2. Svatý – D\n3. Beránku – Em, kapodastr 2';
     const count = document.createElement('span');
     count.className = 'count';
     const upd = () => { count.textContent = ta.value.length ? ta.value.length + ' / ' + NOTE_MAX : ''; };
     ta.addEventListener('input', upd);
     upd();
-    ta.setAttribute('aria-label', 'Poznámka k playlistu ' + it.title);
+    ln.append(ta, count);
+
     const err = document.createElement('p');
     err.className = 'noteerr';
     err.hidden = true;
+
     const btns = document.createElement('div');
     btns.className = 'btns';
     const save = document.createElement('button');
@@ -692,17 +828,26 @@
     cancel.type = 'button';
     cancel.className = 'btn ghost small';
     cancel.textContent = 'Zrušit';
-    cancel.addEventListener('click', () => { editingName = null; render(); });
+    cancel.addEventListener('click', () => { editingPath = null; render(); });
+    btns.append(save, cancel);
+
     f.addEventListener('submit', async e => {
       e.preventDefault();
+      const t = title.value.trim();
+      if (!t) { err.textContent = 'Zadej název playlistu.'; err.hidden = false; return; }
+      const chosen = fs.querySelector('input:checked');
+      const v = { title: t, date: date.value, cat: chosen ? chosen.value : null, note: ta.value, initial };
+      v.metaChanged = t !== initial.title.trim() || v.date !== initial.date || v.cat !== initial.cat;
+
       save.disabled = true;
       save.textContent = 'Ukládám…';
       err.hidden = true;
       try {
-        await saveNote(it.name, ta.value);
-        editingName = null;
-        render();
-        toast('Poznámka uložená.');
+        const r = await applyEdit(it, v);
+        editingPath = null;
+        if (filter !== 'all' && r.item.cat !== filter && CATS[r.item.cat] && r.item.cat !== 'jine') setFilter(r.item.cat);
+        else render();
+        toast(r.warning || 'Uloženo.');
       } catch (ex) {
         if (ex.auth) { toast(ex.message); return; }
         err.textContent = ex.message || 'Uložení se nepovedlo.';
@@ -711,9 +856,9 @@
         save.textContent = 'Uložit';
       }
     });
-    btns.append(save, cancel);
-    f.append(ta, count, err, btns);
-    setTimeout(() => ta.focus(), 0);
+
+    f.append(row, fs, ln, err, btns);
+    setTimeout(() => (editFocus === 'note' ? ta : title).focus(), 0);
     return f;
   }
 
@@ -799,18 +944,27 @@
     info.append(n);
 
     const noteText = notes[it.name] || '';
-    if (editingName === it.name && isAdmin) {
+    if (editingPath === it.path && isAdmin) {
       li.classList.add('editing');
-      info.append(noteForm(it, noteText));
+      info.append(editForm(it));
     } else {
       if (noteText) info.append(noteEl(noteText, it.name));
       if (isAdmin) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'addnote';
-        b.textContent = noteText ? 'Upravit poznámku' : '+ Přidat poznámku';
-        b.addEventListener('click', () => { editingName = it.name; render(); });
-        info.append(b);
+        const row = document.createElement('div');
+        row.className = 'arow';
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'editbtn';
+        edit.innerHTML = ICON.edit + '<span>Upravit</span>';
+        edit.setAttribute('aria-label', 'Upravit playlist ' + it.title);
+        edit.addEventListener('click', () => { editingPath = it.path; editFocus = 'title'; render(); });
+        const nb = document.createElement('button');
+        nb.type = 'button';
+        nb.className = 'addnote';
+        nb.textContent = noteText ? 'Upravit poznámku' : '+ Přidat poznámku';
+        nb.addEventListener('click', () => { editingPath = it.path; editFocus = 'note'; render(); });
+        row.append(edit, nb);
+        info.append(row);
       }
     }
 
@@ -887,7 +1041,7 @@
   function logout(silent) {
     token = null;
     isAdmin = false;
-    editingName = null;
+    editingPath = null;
     try { localStorage.removeItem(KEY); } catch (e) {}
     resetUpload();
     applyAdminUI();
