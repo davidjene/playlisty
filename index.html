@@ -261,7 +261,9 @@
   details li{margin:4px 0}
   code{background:rgba(255,255,255,.12); padding:1px 6px; border-radius:6px; font-size:.88em; overflow-wrap:anywhere}
 
-  footer{text-align:center; margin-top:30px}
+  footer{text-align:center; margin-top:30px; padding-bottom:6px}
+  .author{margin:8px 0 0; font-size:.8rem; letter-spacing:.04em; color:var(--muted); opacity:.8}
+  .author b{color:var(--ink); font-weight:700}
   #toast{
     position:fixed; left:50%; bottom:22px; transform:translate(-50%,20px);
     background:#fff; color:#1a1433; font-weight:600;
@@ -367,6 +369,7 @@
 
   <footer>
     <button class="linkbtn" id="adminToggle" type="button">Správce</button>
+    <p class="author">Autor: <b>David Hlosta</b></p>
   </footer>
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
