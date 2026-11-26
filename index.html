@@ -136,6 +136,21 @@
     @keyframes rise{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
   }
   .info{flex:1; min-width:0}
+  /* štítek „Nadcházející“ – barva se mění jen tady (--soon = R,G,B; --soon-t = barva písma) */
+  .soon{
+    --soon:59,232,167; --soon-t:#8af7cf;
+    display:flex; align-items:center; gap:7px; width:fit-content; margin:0 0 7px; padding:3px 11px 3px 9px;
+    border-radius:999px; font-size:.66rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; line-height:1.5;
+    color:var(--soon-t);
+    background:linear-gradient(135deg,rgba(var(--soon),.22),rgba(var(--soon),.08));
+    border:1px solid rgba(var(--soon),.45);
+    box-shadow:0 0 16px rgba(var(--soon),.16);
+  }
+  .soon::before{content:""; flex:none; width:7px; height:7px; border-radius:50%; background:rgb(var(--soon)); box-shadow:0 0 0 0 rgba(var(--soon),.55)}
+  @media (prefers-reduced-motion:no-preference){
+    .soon::before{animation:soonpulse 2s ease-out infinite}
+    @keyframes soonpulse{0%{box-shadow:0 0 0 0 rgba(var(--soon),.55)}70%,100%{box-shadow:0 0 0 7px rgba(var(--soon),0)}}
+  }
   .date{display:block; font-size:.8rem; color:var(--muted)}
   .date::first-letter{text-transform:uppercase}
   .name{display:block; font-weight:700; font-size:1.05rem; overflow-wrap:anywhere}
@@ -162,7 +177,7 @@
     border:1px solid var(--line); border-radius:99px;
   }
   .editbtn:hover{background:rgba(255,255,255,.17)}
-  li.item.editing .date, li.item.editing .name{display:none}
+  li.item.editing .date, li.item.editing .name, li.item.editing .soon{display:none}
   li.item.editing{flex-wrap:wrap}
   li.item.editing .info{flex-basis:100%}
   li.item.editing .actions{display:none}
@@ -295,7 +310,7 @@
 <header class="hero">
   <div class="hero-bg" aria-hidden="true"></div>
   <div class="hero-inner">
-    <p class="eyebrow">Zpěvník pro scholy plus</p>
+    <p class="eyebrow">Zpěvník pro scholy</p>
     <h1>Playlisty pro<br><span class="ga">chvály</span> a <span class="gb">mše</span></h1>
     <p class="sub">Stáhni si playlist a otevři ho v aplikaci Zpěvník pro scholy.</p>
   </div>
@@ -549,6 +564,15 @@
   }
 
   function todayISO() { return iso(new Date()); }
+
+  function syncSoon() {
+    const t = todayISO();
+    document.querySelectorAll('li.item[data-date]').forEach(li => {
+      if (li.dataset.date < t) { const b = li.querySelector('.soon'); if (b) b.remove(); }
+    });
+  }
+  setInterval(syncSoon, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncSoon(); });
 
   function downloadName(name) {
     return name.replace(/\.json$/i, '').replace(/(\.proscholy)?$/i, '.proscholy');
@@ -955,6 +979,13 @@
     const info = document.createElement('div');
     info.className = 'info';
     if (it.date) {
+      li.dataset.date = it.date;
+      if (it.date >= todayISO()) {                 // dnes a v budoucnu; od dalšího dne zmizí
+        const soon = document.createElement('span');
+        soon.className = 'soon';
+        soon.textContent = 'Nadcházející';
+        info.append(soon);
+      }
       const d = document.createElement('span');
       d.className = 'date';
       d.textContent = fmtDate(it);
