@@ -305,6 +305,19 @@
     body.admin li.item .info{flex-basis:100%}
     body.admin li.item .actions{margin-left:auto}
   }
+  /* malé upozornění v okně aplikace (Instagram, Facebook…), které neumí stahovat */
+  .inapp{
+    margin:0 0 16px; padding:11px 13px 12px; border-radius:16px;
+    background:linear-gradient(135deg,rgba(255,176,46,.16),rgba(255,106,61,.07));
+    border:1px solid rgba(255,176,46,.45);
+  }
+  .inapp.flash{animation:inappflash 1s ease-out 1}
+  @keyframes inappflash{0%{box-shadow:0 0 0 0 rgba(255,176,46,.7)}100%{box-shadow:0 0 0 16px rgba(255,176,46,0)}}
+  .inapp p{margin:0; font-size:.85rem; line-height:1.4}
+  .inapp p b{color:#ffd27a}
+  .inapp .row{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+  .inapp .btn{min-height:40px; padding:0 14px; font-size:.85rem; text-decoration:none}
+
 </style>
 </head>
 <body>
@@ -318,6 +331,13 @@
 </header>
 
 <main class="wrap">
+  <section class="inapp" id="inapp" hidden aria-live="polite">
+    <p><b>Tady se stahovat nedá.</b> Otevři stránku v Safari nebo Chromu (⋯ → Otevřít v prohlížeči).</p>
+    <div class="row">
+      <a class="btn" id="inappOpen" href="#" hidden>Otevřít v prohlížeči</a>
+      <button class="btn ghost" id="inappCopy" type="button">Zkopírovat odkaz</button>
+    </div>
+  </section>
   <div class="bar">
     <div class="tabs" role="tablist" aria-label="Druh playlistu">
       <button class="tab" role="tab" type="button" data-f="all" aria-selected="true" aria-controls="groups">Vše <span class="n">0</span></button>
@@ -1046,6 +1066,78 @@
   window.addEventListener('hashchange', () => setFilter({ '#chvaly': 'chvaly', '#mse': 'mse' }[location.hash] || 'all', true));
 
   /* ---------- Stažení ---------- */
+  /* ---------- Okno aplikace (Instagram, Facebook…) ---------- */
+  // vrací název aplikace, nebo '' když jde o běžný prohlížeč
+  function inAppName() {
+    const ua = navigator.userAgent || '';
+    if (window.navigator.standalone === true) return '';
+    try { if (window.matchMedia('(display-mode: standalone)').matches) return ''; } catch (e) { /* nic */ }
+    if (/Instagram/i.test(ua)) return 'Instagram';
+    if (/FBAN\/Messenger|MessengerForiOS|Orca-Android|FB_IAB\/MESSENGER/i.test(ua)) return 'Messenger';
+    if (/FBAN|FBAV|FB_IAB|FBIOS/i.test(ua)) return 'Facebook';
+    if (/TikTok|musical_ly|Bytedance/i.test(ua)) return 'TikTok';
+    if (/Snapchat/i.test(ua)) return 'Snapchat';
+    if (/LinkedInApp/i.test(ua)) return 'LinkedIn';
+    if (/\bLine\//i.test(ua)) return 'LINE';
+    if (/Android/i.test(ua) && /; wv\)/.test(ua)) return 'Tahle aplikace';                                   // obecné okno aplikace na Androidu
+    if (/iPhone|iPad|iPod/i.test(ua) && !/Safari\//.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua)) return 'Tahle aplikace';  // obecné okno aplikace na iPhonu
+    return '';
+  }
+  const APP = inAppName();
+
+  function pageUrl() { return location.origin + location.pathname; }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject) => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed; top:0; left:0; opacity:0; font-size:16px';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { /* nic */ }
+      ta.remove();
+      ok ? resolve() : reject(new Error('copy'));
+    });
+  }
+
+  function initInApp() {
+    if (!APP) return;
+    $('inapp').hidden = false;
+    if (APP === 'Instagram') {
+      const a = $('inappOpen');
+      a.href = 'instagram://extbrowser/?url=' + encodeURIComponent(pageUrl());   // Instagram sám otevře adresu v běžném prohlížeči
+      a.hidden = false;
+    }
+    $('inappCopy').addEventListener('click', async () => {
+      const b = $('inappCopy');
+      const old = b.textContent;
+      try {
+        await copyText(pageUrl());
+        b.textContent = 'Zkopírováno ✓';
+      } catch (e) {
+        b.textContent = 'Zkopíruj z adresního řádku';
+      }
+      setTimeout(() => { b.textContent = old; }, 2500);
+    });
+  }
+  initInApp();
+
+  function warnInApp() {
+    if (!APP) return;
+    toast('Nic se nestáhlo? Otevři stránku v běžném prohlížeči.');
+    const b = $('inapp');
+    b.classList.remove('flash');
+    void b.offsetWidth;
+    b.classList.add('flash');
+    b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   async function download(it, btn) {
     const label = btn.querySelector('span');
     const old = label.textContent;
@@ -1070,8 +1162,9 @@
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+      warnInApp();
     } catch (e) {
-      toast('Stažení se nepovedlo. Zkus to prosím znovu.');
+      if (APP) warnInApp(); else toast('Stažení se nepovedlo. Zkus to prosím znovu.');
     } finally {
       btn.disabled = false;
       label.textContent = old;
