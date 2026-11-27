@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0d0b1a">
-<title>Playlisty pro chvály a mše plus</title>
+<title>Playlisty pro chvály a mše</title>
 <!-- ikona zástupce na ploše (iPhone, Android) a záložky prohlížeče; soubory leží vedle index.html -->
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -231,7 +231,8 @@
   @media (min-width:520px){ form .row.two{grid-template-columns:minmax(0,1fr) 190px} }
   label.f{display:grid; grid-template-columns:minmax(0,1fr); gap:4px; font-size:.85rem; color:var(--muted); min-width:0}
   input[type=text],input[type=password],input[type=date]{
-    font:inherit; color:var(--ink); background:rgba(255,255,255,.08);
+    font:inherit; font-size:16px;   /* min. 16 px, jinak iPhone při klepnutí do pole přiblíží celou stránku */
+    color:var(--ink); background:rgba(255,255,255,.08);
     border:1px solid var(--line); border-radius:12px;
     min-height:46px; padding:8px 12px; width:100%; min-width:0; max-width:100%;
   }
@@ -246,7 +247,7 @@
   input[type=date]::-webkit-datetime-edit{padding:0; line-height:22px}
   input[type=date]::-webkit-datetime-edit-fields-wrapper{padding:0}
   textarea{
-    font:inherit; color:var(--ink); background:rgba(255,255,255,.08);
+    font:inherit; font-size:16px; color:var(--ink); background:rgba(255,255,255,.08);
     border:1px solid var(--line); border-radius:12px;
     padding:10px 12px; width:100%; min-height:132px; resize:vertical; line-height:1.45;
   }
@@ -310,7 +311,7 @@
 <header class="hero">
   <div class="hero-bg" aria-hidden="true"></div>
   <div class="hero-inner">
-    <p class="eyebrow">Zpěvník pro scholy plus</p>
+    <p class="eyebrow">Zpěvník pro scholy</p>
     <h1>Playlisty pro<br><span class="ga">chvály</span> a <span class="gb">mše</span></h1>
     <p class="sub">Stáhni si playlist a otevři ho v aplikaci Zpěvník pro scholy.</p>
   </div>
